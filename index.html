@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title>TooAudience · Panel de Finanzas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>TooAudience</h1>
+      <span class="subtitle">Panel de finanzas · en vivo desde Google Sheets</span>
+    </div>
+    <div class="controls">
+      <label class="field">
+        <span>Mes</span>
+        <select id="mesSelect" aria-label="Mes activo"></select>
+      </label>
+      <button id="refreshBtn" class="btn" type="button">↻ Actualizar</button>
+      <span id="lastUpdate" class="last-update"></span>
+    </div>
+  </header>
+
+  <main id="main" class="container" hidden>
+    <!-- Pregunta 1 -->
+    <section>
+      <h2 class="section-title">¿Cuánto ganó TooAudience este mes?</h2>
+      <div class="kpi-grid">
+        <article class="kpi"><span class="kpi-label">Ingresos (caja)</span><span id="kpiIngresos" class="kpi-value pos">—</span></article>
+        <article class="kpi"><span class="kpi-label">Egresos</span><span id="kpiEgresos" class="kpi-value">—</span></article>
+        <article class="kpi highlight"><span class="kpi-label">Resultado operativo</span><span id="kpiResultado" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Margen</span><span id="kpiMargen" class="kpi-value">—</span></article>
+      </div>
+    </section>
+
+    <!-- Pregunta 2 -->
+    <section>
+      <h2 class="section-title">¿Cuánto por línea de negocio?</h2>
+      <div class="grid-2">
+        <div class="ln-cards">
+          <article class="ln-card">
+            <header>LN-01 · TooAudience (Total)</header>
+            <div class="ln-row"><span>Ingresos</span><span id="lnTotalIng" class="mono">—</span></div>
+            <div class="ln-row"><span>Resultado</span><span id="lnTotalRes" class="mono">—</span></div>
+          </article>
+          <article class="ln-card">
+            <header>LN-02 · ADPD (atribuido)</header>
+            <div class="ln-row"><span>Ingresos</span><span id="lnAdpdIng" class="mono">—</span></div>
+            <div class="ln-row"><span>Resultado</span><span id="lnAdpdRes" class="mono">—</span></div>
+          </article>
+          <article class="ln-card muted">
+            <header>LN-03 · Alianza Rieznik</header>
+            <div class="ln-note">No disponible en esta vista (no figura en Evolución_Mensual del Sheet).</div>
+          </article>
+        </div>
+        <div class="chart-card">
+          <h3>Comparativa por línea</h3>
+          <div class="chart-wrap"><canvas id="chartLinea"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Desgloses -->
+    <section>
+      <h2 class="section-title">Desglose del mes</h2>
+      <div class="grid-2">
+        <div class="chart-card">
+          <h3>Ingresos por canal / ventas</h3>
+          <div class="chart-wrap"><canvas id="chartCanales"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Egresos por categoría</h3>
+          <div class="chart-wrap"><canvas id="chartCategorias"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Evolución -->
+    <section>
+      <h2 class="section-title">Evolución mensual 2026</h2>
+      <div class="chart-card">
+        <div class="chart-wrap tall"><canvas id="chartEvolucion"></canvas></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="loading" class="overlay"><div class="spinner"></div><p>Cargando datos del Sheet…</p></div>
+  <div id="error" class="overlay" hidden>
+    <p class="error-title">No se pudo leer el Google Sheet</p>
+    <p id="errorMsg" class="error-msg"></p>
+    <p class="error-hint">Verificá que el Sheet siga compartido como “cualquiera con el enlace puede ver”.</p>
+    <button id="retryBtn" class="btn" type="button">Reintentar</button>
+  </div>
+
+  <!-- Chart.js servido localmente (mismo origen): evita que la Prevención de
+       Seguimiento del navegador o un firewall bloqueen el CDN. -->
+  <script src="chart.umd.min.js?v=4"></script>
+  <!-- App (orden importa: config → datos → cálculo → gráficos → orquestación) -->
+  <!-- ?v= fuerza recarga sin caché; subir el número al cambiar el código -->
+  <script src="config.js?v=4"></script>
+  <script src="sheets.js?v=4"></script>
+  <script src="calc.js?v=4"></script>
+  <script src="charts.js?v=4"></script>
+  <script src="app.js?v=4"></script>
+</body>
+</html>

@@ -12,10 +12,13 @@
     refreshBtn: document.getElementById("refreshBtn"),
     retryBtn: document.getElementById("retryBtn"),
     lastUpdate: document.getElementById("lastUpdate"),
+    vistaMes: document.getElementById("vistaMes"),
+    vistaYtd: document.getElementById("vistaYtd"),
   };
 
   let model = null;
   let selectedKey = null;
+  let vista = "mes"; // "mes" | "ytd"
   let timer = null;
 
   function show(node, visible) {
@@ -35,13 +38,19 @@
     show(el.error, true);
   }
 
-  // Lee ambas pestañas en paralelo y arma el modelo.
+  // Lee todas las pestañas en paralelo y arma el modelo.
   async function fetchModel() {
-    const [evolucion, parametros] = await Promise.all([
-      Sheets.fetchSheet(CONFIG.SHEETS.evolucion),
-      Sheets.fetchSheet(CONFIG.SHEETS.parametros),
-    ]);
-    return Calc.buildModel({ evolucion, parametros });
+    const [evolucion, parametros, ingresos, cuentas, egresosDetalle, egresosExternos, cuentasVerificar] =
+      await Promise.all([
+        Sheets.fetchSheet(CONFIG.SHEETS.evolucion),
+        Sheets.fetchSheet(CONFIG.SHEETS.parametros),
+        Sheets.fetchSheet(CONFIG.SHEETS.ingresos),
+        Sheets.fetchSheet(CONFIG.SHEETS.cuentasCobrar),
+        Sheets.fetchSheet(CONFIG.SHEETS.egresosDetalle),
+        Sheets.fetchSheet(CONFIG.SHEETS.egresosExternos),
+        Sheets.fetchSheet(CONFIG.SHEETS.cuentasVerificar),
+      ]);
+    return Calc.buildModel({ evolucion, parametros, ingresos, cuentas, egresosDetalle, egresosExternos, cuentasVerificar });
   }
 
   function populateSelector() {
@@ -61,9 +70,33 @@
   }
 
   function render() {
+    if (vista === "ytd") {
+      Charts.renderAll(model, model.ytd, null, model.getPosicion(null), `Acumulado ${model.anioFiscal}`);
+      return;
+    }
     const mes = model.getMes(selectedKey);
     if (!mes) return;
-    Charts.renderAll(model, mes);
+    Charts.renderAll(
+      model, mes, model.getPrevMes(selectedKey),
+      model.getPosicion(selectedKey), Calc.Format.monthLabel(selectedKey)
+    );
+  }
+
+  // Refleja la vista activa en el toggle y atenúa el selector de mes en YTD.
+  function syncVista() {
+    const esYtd = vista === "ytd";
+    el.vistaYtd.classList.toggle("is-active", esYtd);
+    el.vistaMes.classList.toggle("is-active", !esYtd);
+    el.vistaYtd.setAttribute("aria-pressed", String(esYtd));
+    el.vistaMes.setAttribute("aria-pressed", String(!esYtd));
+    el.mesSelect.disabled = esYtd;
+  }
+
+  function setVista(v) {
+    if (vista === v) return;
+    vista = v;
+    syncVista();
+    render();
   }
 
   function stampUpdate() {
@@ -124,6 +157,8 @@
   });
   el.refreshBtn.addEventListener("click", refresh);
   el.retryBtn.addEventListener("click", load);
+  el.vistaMes.addEventListener("click", () => setVista("mes"));
+  el.vistaYtd.addEventListener("click", () => setVista("ytd"));
 
   load();
 })();

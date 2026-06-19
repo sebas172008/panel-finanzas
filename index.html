@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>TooAudience · Panel de Finanzas</title>
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <header class="topbar">
@@ -14,6 +14,10 @@
       <span class="subtitle">Panel de finanzas · en vivo desde Google Sheets</span>
     </div>
     <div class="controls">
+      <div class="seg" role="group" aria-label="Vista">
+        <button id="vistaMes" class="seg-btn is-active" type="button" aria-pressed="true">Mes</button>
+        <button id="vistaYtd" class="seg-btn" type="button" aria-pressed="false">Acumulado (YTD)</button>
+      </div>
       <label class="field">
         <span>Mes</span>
         <select id="mesSelect" aria-label="Mes activo"></select>
@@ -24,14 +28,31 @@
   </header>
 
   <main id="main" class="container" hidden>
+    <!-- Posición de caja: lo que Jesús revisa cada lunes -->
+    <section>
+      <h2 class="section-title">¿Cuánto dinero tenemos? · <span id="posMesLabel">—</span></h2>
+      <div class="pos-grid">
+        <article class="kpi"><span class="kpi-label">Ingresos plataformas (caja)</span><span id="posPlataformas" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Otros ingresos</span><span id="posOtros" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Otras plataformas (confirmado)</span><span id="posOtrasPlataformas" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Por cobrar (pendiente)</span><span id="posPorCobrar" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Egresos (Detalle + Externos)</span><span id="posEgresos" class="kpi-value">—</span></article>
+        <article class="kpi highlight"><span class="kpi-label">Disponible + por cobrar</span><span id="posNeto" class="kpi-value">—</span></article>
+      </div>
+      <div class="chart-card pos-chart">
+        <h3>Cómo se compone</h3>
+        <div class="chart-wrap"><canvas id="chartPosicion"></canvas></div>
+      </div>
+    </section>
+
     <!-- Pregunta 1 -->
     <section>
       <h2 class="section-title">¿Cuánto ganó TooAudience este mes?</h2>
       <div class="kpi-grid">
-        <article class="kpi"><span class="kpi-label">Ingresos (caja)</span><span id="kpiIngresos" class="kpi-value pos">—</span></article>
-        <article class="kpi"><span class="kpi-label">Egresos</span><span id="kpiEgresos" class="kpi-value">—</span></article>
-        <article class="kpi highlight"><span class="kpi-label">Resultado operativo</span><span id="kpiResultado" class="kpi-value">—</span></article>
-        <article class="kpi"><span class="kpi-label">Margen</span><span id="kpiMargen" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Ingresos (caja)</span><span id="kpiIngresos" class="kpi-value pos">—</span><span id="kpiIngresosDelta" class="kpi-delta" hidden></span></article>
+        <article class="kpi"><span class="kpi-label">Egresos</span><span id="kpiEgresos" class="kpi-value">—</span><span id="kpiEgresosDelta" class="kpi-delta" hidden></span></article>
+        <article class="kpi highlight"><span class="kpi-label">Resultado operativo</span><span id="kpiResultado" class="kpi-value">—</span><span id="kpiResultadoDelta" class="kpi-delta" hidden></span></article>
+        <article class="kpi"><span class="kpi-label">Margen</span><span id="kpiMargen" class="kpi-value">—</span><span id="kpiMargenDelta" class="kpi-delta" hidden></span></article>
       </div>
     </section>
 
@@ -99,10 +120,10 @@
   <script src="chart.umd.min.js?v=4"></script>
   <!-- App (orden importa: config → datos → cálculo → gráficos → orquestación) -->
   <!-- ?v= fuerza recarga sin caché; subir el número al cambiar el código -->
-  <script src="config.js?v=4"></script>
-  <script src="sheets.js?v=4"></script>
-  <script src="calc.js?v=4"></script>
-  <script src="charts.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="config.js?v=9"></script>
+  <script src="sheets.js?v=9"></script>
+  <script src="calc.js?v=9"></script>
+  <script src="charts.js?v=9"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

@@ -24,6 +24,38 @@ const Charts = (() => {
     el.classList.toggle("neg", Number(n) < 0);
   }
 
+  // Badge de tendencia ▲/▼ vs. el valor previo.
+  //  - mode "money": variación porcentual (cur-prev)/|prev|.
+  //  - mode "points": diferencia en puntos (para márgenes), sufijo "pp".
+  // higherIsBetter define el color: subir es verde salvo en egresos (rojo).
+  function setDelta(id, cur, prev, { higherIsBetter, mode }) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // Sin comparación posible (modo YTD o primer mes con datos): ocultar.
+    if (prev == null || (mode === "money" && Number(prev) === 0)) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+
+    const cur_ = Number(cur), prev_ = Number(prev);
+    let diff, texto;
+    if (mode === "points") {
+      diff = cur_ * 100 - prev_ * 100;
+      texto = `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)} pp`;
+    } else {
+      diff = (cur_ - prev_) / Math.abs(prev_);
+      texto = `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff * 100).toFixed(1)}%`;
+    }
+
+    const bueno = diff >= 0 ? higherIsBetter : !higherIsBetter;
+    el.hidden = false;
+    el.textContent = texto;
+    el.classList.toggle("pos", bueno);
+    el.classList.toggle("neg", !bueno);
+  }
+
   function draw(canvasId, configFn) {
     if (instances[canvasId]) {
       instances[canvasId].destroy();
@@ -37,7 +69,9 @@ const Charts = (() => {
   const moneyTick = (v) => F.money(v).replace(/[,\.]00$/, "");
 
   // ── KPIs (pregunta 1: ¿cuánto ganó TooAudience este mes?) ──────────────────
-  function renderKpis(mes) {
+  // `prev` (opcional): mes anterior con datos para los badges de tendencia.
+  // Si es null (modo YTD o primer mes), los badges se ocultan.
+  function renderKpis(mes, prev) {
     setMonto("kpiIngresos", mes.ingresosTotal);
     setMonto("kpiEgresos", mes.egresosTotal);
     setMonto("kpiResultado", mes.resultadoOperativo);
@@ -46,6 +80,43 @@ const Charts = (() => {
       margenEl.textContent = F.percent(mes.margen);
       margenEl.classList.toggle("neg", Number(mes.margen) < 0);
     }
+
+    setDelta("kpiIngresosDelta", mes.ingresosTotal, prev && prev.ingresosTotal, { higherIsBetter: true, mode: "money" });
+    setDelta("kpiEgresosDelta", mes.egresosTotal, prev && prev.egresosTotal, { higherIsBetter: false, mode: "money" });
+    setDelta("kpiResultadoDelta", mes.resultadoOperativo, prev && prev.resultadoOperativo, { higherIsBetter: true, mode: "money" });
+    setDelta("kpiMargenDelta", mes.margen, prev ? prev.margen : null, { higherIsBetter: true, mode: "points" });
+  }
+
+  // ── Posición del mes: ¿Cuánto dinero tenemos? ──────────────────────────────
+  // pos = { plataformas, otros, porCobrar, egresos, neto }; etiqueta = mes/YTD.
+  function renderPosicion(pos, etiqueta) {
+    setText("posMesLabel", etiqueta || "");
+    setMonto("posPlataformas", pos.plataformas);
+    setMonto("posOtros", pos.otros);
+    setMonto("posOtrasPlataformas", pos.otrasPlataformas);
+    setMonto("posPorCobrar", pos.porCobrar);
+    setMonto("posEgresos", -pos.egresos); // se muestra en negativo (rojo)
+    setMonto("posNeto", pos.neto);
+
+    draw("chartPosicion", () => ({
+      type: "bar",
+      data: {
+        labels: ["Plataformas", "Otros ingr.", "Otras plat.", "Por cobrar", "Egresos", "Neto"],
+        datasets: [{
+          data: [pos.plataformas, pos.otros, pos.otrasPlataformas, pos.porCobrar, -pos.egresos, pos.neto],
+          backgroundColor: [COLOR_ING, "#0891b2", "#7c3aed", "#f59e0b", COLOR_EGR, COLOR_RES],
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => F.money(c.parsed.y) } },
+        },
+        scales: { y: { ticks: { callback: moneyTick } } },
+      },
+    }));
   }
 
   // ── Línea de negocio (pregunta 2) ──────────────────────────────────────────
@@ -144,13 +215,14 @@ const Charts = (() => {
     }));
   }
 
-  function renderAll(model, mes) {
-    renderKpis(mes);
+  function renderAll(model, mes, prev, posicion, etiquetaPos) {
+    if (posicion) renderPosicion(posicion, etiquetaPos);
+    renderKpis(mes, prev);
     renderLineaNegocio(mes);
     renderCanales(mes);
     renderCategorias(mes);
     renderEvolucion(model);
   }
 
-  return { renderAll, renderKpis, renderLineaNegocio, renderCanales, renderCategorias, renderEvolucion, setText };
+  return { renderAll, renderKpis, renderPosicion, renderLineaNegocio, renderCanales, renderCategorias, renderEvolucion, setText };
 })();

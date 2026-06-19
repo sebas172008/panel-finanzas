@@ -25,6 +25,14 @@ const CONFIG = {
   SHEETS: {
     evolucion: "Evolución_Mensual",
     parametros: "Parámetros",
+    // Pestañas de detalle para la sección "¿Cuánto dinero tenemos?" (posición de
+    // caja + por cobrar − egresos). Se leen crudas y se filtran por mes en JS.
+    ingresos: "Ingresos",
+    cuentasCobrar: "Cuentas_por_Cobrar",
+    egresosDetalle: "Egresos_Detalle",
+    egresosExternos: "Egresos_Externos",
+    // Ingresos en cuentas que solo accede Jesús (PayPal, USDT directos, Brubank…).
+    cuentasVerificar: "Cuentas_A_Verificar",
   },
 
   // ── Mapeo de la matriz Evolución_Mensual ──────────────────────────────────
@@ -78,6 +86,34 @@ const CONFIG = {
     FILA_ANIO_FISCAL: "Año fiscal",
     COL_ETIQUETA: 0,
     COL_VALOR: 1,
+  },
+
+  // ── Posición del mes: "¿Cuánto dinero tenemos?" ───────────────────────────
+  // Se reconstruye desde las pestañas de detalle filtrando por la columna Mes
+  // (string "YYYY-MM"), para que siga al selector de mes del panel. Reconcilia
+  // 1:1 con la columna PyG_TooAudience del Sheet para el mes activo.
+  //   Neto = Plataformas (caja) + Otros ingresos + Por cobrar (pendiente)
+  //          − (Egresos_Detalle + Egresos_Externos)  [ambos en crudo]
+  // Los índices de columna son 0-based según table.rows[i] de gviz.
+  POSICION: {
+    INGRESOS: {
+      COL_CANAL: 2, COL_NETO: 6, COL_MES: 9,
+      // Canales que cuentan como "plataformas" (= TOTAL INGRESOS caja de PyG).
+      // "Brubank" = ventas ADPD directas cobradas en la cuenta de Jesús (cargadas
+      // en Ingresos, no en Cuentas_A_Verificar, porque el monto se conoce del CRM).
+      // "USDT-Financiera" = USDT vía Financiera; en PyG es la línea
+      // "USDT (Financiera USDT)", parte del TOTAL INGRESOS caja.
+      CANALES_PLATAFORMA: ["Hotmart", "Financiera", "Shopify", "Dlocal", "Brubank", "USDT-Financiera"],
+      // Canal de "otros ingresos / no-operativos" (Revolut, Multi D, etc.).
+      CANAL_OTROS: "Otros",
+    },
+    // Solo filas pendientes; se excluye "Pendiente-Detalle" (informativo) y las
+    // ya cobradas (esas ya están en la caja de Ingresos → evita doble conteo).
+    CUENTAS: { COL_MONTO: 4, COL_ESTADO: 5, COL_MES_ORIGEN: 9 },
+    EGRESOS_DETALLE: { COL_MONTO: 5, COL_MES: 8 },
+    EGRESOS_EXTERNOS: { COL_MONTO: 7, COL_MES: 10 },
+    // "Otras plataformas": solo suma filas con Estado "Confirmado-Con movimiento".
+    CUENTAS_VERIFICAR: { COL_ESTADO: 3, COL_MONTO: 5, COL_MES: 9 },
   },
 
   // Nombres de meses en español (índice 0 = Enero).

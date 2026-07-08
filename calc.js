@@ -56,6 +56,77 @@ const Calc = (() => {
     return { mesActivo, anioFiscal };
   }
 
+  // gviz devuelve fechas como el string "Date(2026,1,3)" (mes 0-based).
+  // → { anio, mes (1-12), dia } o null si no matchea.
+  function parseGvizDate(v) {
+    if (typeof v !== "string") return null;
+    const m = v.match(/Date\((\d+),(\d+),(\d+)/);
+    if (!m) return null;
+    return { anio: +m[1], mes: +m[2] + 1, dia: +m[3] };
+  }
+
+  // ── Ingresos acumulados día a día dentro de un mes ─────────────────────────
+  // Suma el Neto (caja) de la pestaña Ingresos del mes `monthKey`, agrupado por
+  // día, y lo devuelve acumulado: sirve para ver "cómo venimos en el mes".
+  //   acumulado[i] = total de caja hasta el día (i+1) inclusive.
+  // Si monthKey es null (vista YTD) o no hay datos, devuelve series vacías.
+  function computeIngresosDiarios(ingresos, monthKey) {
+    const I = CONFIG.POSICION.INGRESOS;
+    const esMes = typeof monthKey === "string" && /^\d{4}-\d{2}$/.test(monthKey);
+    const porDia = {}; // dia → monto del día
+    if (ingresos && esMes) {
+      for (const r of ingresos.rows) {
+        if (r[I.COL_MES] !== monthKey) continue;
+        const f = parseGvizDate(r[I.COL_FECHA]);
+        if (!f || !f.dia) continue;
+        porDia[f.dia] = (porDia[f.dia] || 0) + num(r[I.COL_NETO]);
+      }
+    }
+    const dias = Object.keys(porDia).map(Number);
+    const ultimoDia = dias.length ? Math.max(...dias) : 0;
+    const acumulado = [];
+    const montoDia = [];
+    let acc = 0;
+    for (let d = 1; d <= ultimoDia; d++) {
+      acc += porDia[d] || 0;
+      montoDia.push(porDia[d] || 0);
+      acumulado.push(acc);
+    }
+    return { ultimoDia, montoDia, acumulado, total: acc };
+  }
+
+  // ── Evolución del detalle de egresos (por concepto, mes a mes) ─────────────
+  // Agrupa la pestaña Egresos_Detalle por PROVEEDOR (p. ej. "Facebook Ads",
+  // "Google Ads", "Claude") y arma, para cada concepto, su gasto por mes. Sirve
+  // para comparar de un mes a otro si se gastó de más en un egreso puntual.
+  // Devuelve { meses:['YYYY-MM'…], conceptos:[{label,total,porMes:{mes:monto}}] }
+  // con los conceptos ordenados de mayor a menor gasto acumulado.
+  function computeEgresosDetalleEvol(egresosDetalle) {
+    const ED = CONFIG.POSICION.EGRESOS_DETALLE;
+    const isMonth = (v) => typeof v === "string" && /^\d{4}-\d{2}$/.test(v);
+    const conceptos = {}; // label → { label, total, porMes }
+    const mesesSet = new Set();
+
+    if (egresosDetalle) {
+      for (const r of egresosDetalle.rows) {
+        const mes = r[ED.COL_MES];
+        if (!isMonth(mes)) continue;
+        const monto = num(r[ED.COL_MONTO]);
+        if (!monto) continue;
+        const label = norm(r[ED.COL_PROVEEDOR]) || norm(r[ED.COL_DESCRIPCION]) || "Sin detalle";
+        mesesSet.add(mes);
+        const c = conceptos[label] || (conceptos[label] = { label, total: 0, porMes: {} });
+        c.total += monto;
+        c.porMes[mes] = (c.porMes[mes] || 0) + monto;
+      }
+    }
+
+    return {
+      meses: [...mesesSet].sort(),
+      conceptos: Object.values(conceptos).sort((a, b) => b.total - a.total),
+    };
+  }
+
   // ── Posición del mes ("¿Cuánto dinero tenemos?") ───────────────────────────
   // Reconstruye, desde las pestañas de detalle filtrando por la columna Mes,
   // los componentes que Jesús revisa semanalmente. `monthKey` = 'YYYY-MM' para
@@ -118,9 +189,11 @@ const Calc = (() => {
     }
 
     const egresos = egDetalle + egExternos;
+    const totalIngresos = plataformas + otros + otrasPlataformas + porCobrar;
     return {
       plataformas, otros, otrasPlataformas, porCobrar, egDetalle, egExternos, egresos,
-      neto: plataformas + otros + otrasPlataformas + porCobrar - egresos,
+      totalIngresos,
+      neto: totalIngresos - egresos,
     };
   }
 
@@ -205,11 +278,141 @@ const Calc = (() => {
       // que recalcule al cambiar el mes sin re-leer el Sheet.
       getPosicion: (key) =>
         computePosicion({ ingresos, cuentas, egresosDetalle, egresosExternos, cuentasVerificar }, key),
+      // Acumulado de caja día a día dentro del mes `key` (para "cómo venimos").
+      getIngresosDiarios: (key) => computeIngresosDiarios(ingresos, key),
+      // Detalle de egresos por concepto y mes (no depende del mes seleccionado:
+      // siempre muestra todos los meses para comparar la evolución de cada gasto).
+      getEgresosDetalleEvol: () => computeEgresosDetalleEvol(egresosDetalle),
       getMes: (key) => meses.find((m) => m.key === key) || null,
       // Mes anterior CON DATOS respecto de `key` (o null si es el primero).
       getPrevMes: (key) => {
         const pos = conDatos.findIndex((m) => m.key === key);
         return pos > 0 ? conDatos[pos - 1] : null;
+      },
+    };
+  }
+
+  // ── Alianza Rieznik (P&L 50/50 Jesús / Martín, por mes) ────────────────────
+  // Rediseño jun-2026: la Alianza vive en 4 pestañas propias del Sheet. Acá se
+  // lee la matriz Evolución_Alianza igual que Evolución_Mensual (los números
+  // del P&L salen 1:1 del Sheet, sin re-calcular atribución) y, desde
+  // Alianza_Detalle, se arma POR CADA MES la liquidación entre socios — la
+  // pestaña Liquidación_Alianza del Sheet está fija al mes activo de
+  // Parámetros, así que de ella solo se lee el Aporte de capital (constante).
+
+  // Celda "mes" en cualquier formato que devuelva gviz ("Date(2026,5,1)",
+  // serial de Excel o texto "YYYY-MM") → 'YYYY-MM', o null si no es un mes.
+  function cellMesKey(v) {
+    if (typeof v === "number") {
+      const { anio, mes } = excelSerialToYM(v);
+      return mesKey(anio, mes);
+    }
+    const g = parseGvizDate(v);
+    if (g) return mesKey(g.anio, g.mes);
+    const m = /^(\d{4})-(\d{2})/.exec(typeof v === "string" ? v.trim() : "");
+    return m ? `${m[1]}-${m[2]}` : null;
+  }
+
+  function buildAlianza({ evolucion, detalle, liquidacion }, mesActivo) {
+    const EA = CONFIG.EVOLUCION_ALIANZA;
+    const D = CONFIG.ALIANZA_DETALLE;
+
+    // 1) Matriz Evolución_Alianza → serie de 12 valores por clave lógica + YTD.
+    const serie = {};
+    const ytdRaw = {};
+    let anio = null;
+    for (const row of ((evolucion && evolucion.rows) || [])) {
+      const key = EA.FILAS[norm(row[0])];
+      if (key) {
+        serie[key] = EA.MES_COLS.map((ci) => num(row[ci]));
+        ytdRaw[key] = num(row[EA.YTD_COL]);
+        continue;
+      }
+      // Fila de encabezado (col A vacía, meses como fecha): da el año fiscal.
+      if (anio == null && norm(row[0]) === "") {
+        const k = cellMesKey(row[EA.MES_COLS[0]]);
+        if (k) anio = parseInt(k.slice(0, 4), 10);
+      }
+    }
+    if (anio == null) anio = new Date().getFullYear();
+
+    const get = (key, i) => (serie[key] ? serie[key][i] : 0);
+
+    // 2) Alianza_Detalle → flujos por socio y lista de egresos, por mes.
+    const flujos = {};     // 'YYYY-MM' → { jesus:{cobro,pago}, martin:{cobro,pago} }
+    const egresosMes = {}; // 'YYYY-MM' → [{descripcion, origen, monto}]
+    for (const r of ((detalle && detalle.rows) || [])) {
+      const k = cellMesKey(r[D.COL.MES]) || cellMesKey(r[D.COL.FECHA]);
+      const monto = num(r[D.COL.MONTO]);
+      if (!k || !monto) continue; // filas vacías o pre-formateadas sin monto
+      const esIngreso = norm(r[D.COL.TIPO]) === D.TIPO_INGRESO;
+      const socio = D.ORIGEN_SOCIO[norm(r[D.COL.ORIGEN])];
+      if (socio) {
+        const f = flujos[k] || (flujos[k] = { jesus: { cobro: 0, pago: 0 }, martin: { cobro: 0, pago: 0 } });
+        f[socio][esIngreso ? "cobro" : "pago"] += monto;
+      }
+      if (!esIngreso) {
+        (egresosMes[k] = egresosMes[k] || []).push({
+          descripcion: norm(r[D.COL.DESCRIPCION]) || norm(r[D.COL.CANAL]) || "Sin detalle",
+          origen: norm(r[D.COL.ORIGEN]),
+          monto,
+        });
+      }
+    }
+
+    // 3) Aporte de capital por socio (constante) desde Liquidación_Alianza.
+    const L = CONFIG.LIQUIDACION_ALIANZA;
+    const aporte = { jesus: 0, martin: 0 };
+    for (const r of ((liquidacion && liquidacion.rows) || [])) {
+      if (norm(r[0]).startsWith(L.FILA_APORTE)) {
+        aporte.jesus = num(r[L.COL_JESUS]);
+        aporte.martin = num(r[L.COL_MARTIN]);
+        break;
+      }
+    }
+
+    // Un objeto por mes (Ene..Dic), mismo espíritu que buildModel.
+    const mesesAll = EA.MES_COLS.map((_, i) => ({
+      key: mesKey(anio, i + 1),
+      mesNum: i + 1,
+      nombre: CONFIG.MESES_ES[i],
+      ingresos: get("ingresosTotal", i),
+      egresos: get("egresosTotal", i),
+      beneficio: get("beneficio", i),
+      margen: get("margen", i),
+      beneficioSocio: get("beneficioSocio", i),
+      canales: EA.CANALES.map((c) => ({ label: c.label, value: get(c.key, i) })),
+      categorias: EA.CATEGORIAS_EGRESO.map((c) => ({ label: c.label, value: get(c.key, i) })),
+    }));
+
+    // Liquidación del mes: mismas reglas que la pestaña Liquidación_Alianza
+    // (flujo = cobró − pagó; a cada socio le corresponde el 50% del beneficio;
+    // ajuste + = recibe, − = transfiere), pero calculadas para CUALQUIER mes.
+    function liquidacionDe(key) {
+      const f = flujos[key] || { jesus: { cobro: 0, pago: 0 }, martin: { cobro: 0, pago: 0 } };
+      const beneficio = f.jesus.cobro + f.martin.cobro - f.jesus.pago - f.martin.pago;
+      const corresponde = beneficio / 2;
+      const snap = (s, ap) => {
+        const flujo = s.cobro - s.pago;
+        return { cobro: s.cobro, pago: s.pago, flujo, corresponde, ajuste: corresponde - flujo, aporte: ap };
+      };
+      return { jesus: snap(f.jesus, aporte.jesus), martin: snap(f.martin, aporte.martin), beneficio };
+    }
+
+    // Meses con actividad → alimentan el desplegable y el gráfico de evolución.
+    const conDatos = mesesAll.filter((m) => m.ingresos !== 0 || m.egresos !== 0);
+    const meses = conDatos.map((m) => m.key);
+
+    // Mes por defecto: el activo de Parámetros si tiene datos; si no, el último.
+    const defaultKey = meses.includes(mesActivo) ? mesActivo : (meses[meses.length - 1] || null);
+
+    return {
+      meses,
+      defaultKey,
+      mesesConDatos: conDatos,
+      getMes: (key) => {
+        const m = mesesAll.find((x) => x.key === key);
+        return m ? { ...m, liq: liquidacionDe(key), egresosMes: egresosMes[key] || [] } : null;
       },
     };
   }
@@ -232,5 +435,5 @@ const Calc = (() => {
     },
   };
 
-  return { buildModel, Format, _norm: norm, _excelSerialToYM: excelSerialToYM };
+  return { buildModel, buildAlianza, Format, _norm: norm, _excelSerialToYM: excelSerialToYM };
 })();

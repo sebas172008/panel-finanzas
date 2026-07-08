@@ -36,6 +36,7 @@ body {
 .brand h1 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
 .subtitle { font-size: 12px; color: var(--muted); }
 .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.controls-mes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
 .field select {
   margin-top: 2px;
@@ -107,7 +108,34 @@ section { margin-bottom: 32px; }
 }
 .kpi.highlight { border-color: var(--accent); }
 .kpi-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.kpi-label small { display: block; font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
 .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* ── Cards por naturaleza: Ingreso (verde) / Egreso (rojo) / Resultado ─────── */
+.kpi--ingreso { border-left: 5px solid var(--pos); background: #f0fdf4; }
+.kpi--ingreso .kpi-value { color: var(--pos); }
+.kpi--total-ingreso { border: 1px solid var(--pos); border-left: 5px solid var(--pos); background: #dcfce7; }
+.kpi--total-ingreso .kpi-value { color: var(--pos); }
+.kpi--egreso { border-left: 5px solid var(--neg); background: #fef2f2; }
+.kpi--egreso .kpi-value { color: var(--neg); }
+.kpi--resultado { border-width: 2px; }
+
+/* Chip/etiqueta que rotula la naturaleza de la card de un vistazo */
+.kpi-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.kpi-tag--ing { background: var(--pos); color: #fff; }
+.kpi-tag--egr { background: var(--neg); color: #fff; }
+.kpi-tag--res { background: #e5e7eb; color: var(--text); }
+.kpi-tag--res-ok { background: var(--pos); color: #fff; }
+.kpi-tag--res-bad { background: var(--neg); color: #fff; }
 .kpi-value.pos { color: var(--pos); }
 .kpi-value.neg { color: var(--neg); }
 .kpi-delta {
@@ -139,6 +167,14 @@ section { margin-bottom: 32px; }
   box-shadow: var(--shadow);
 }
 .chart-card h3 { margin: 0 0 12px; font-size: 15px; }
+.chart-card-head {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.chart-hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
 .chart-wrap { position: relative; height: 280px; }
 .chart-wrap.tall { height: 360px; }
 

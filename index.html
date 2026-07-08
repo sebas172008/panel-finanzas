@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>TooAudience · Panel de Finanzas</title>
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
   <header class="topbar">
@@ -14,14 +14,28 @@
       <span class="subtitle">Panel de finanzas · en vivo desde Google Sheets</span>
     </div>
     <div class="controls">
-      <div class="seg" role="group" aria-label="Vista">
-        <button id="vistaMes" class="seg-btn is-active" type="button" aria-pressed="true">Mes</button>
-        <button id="vistaYtd" class="seg-btn" type="button" aria-pressed="false">Acumulado (YTD)</button>
-      </div>
       <label class="field">
-        <span>Mes</span>
-        <select id="mesSelect" aria-label="Mes activo"></select>
+        <span>Proyecto</span>
+        <select id="proyectoSelect" aria-label="Proyecto"></select>
       </label>
+      <!-- Controles de mes de TooAudience (Mes/YTD + selector). Se ocultan en Alianza. -->
+      <div id="mesControls" class="controls-mes">
+        <div class="seg" role="group" aria-label="Vista">
+          <button id="vistaMes" class="seg-btn is-active" type="button" aria-pressed="true">Mes</button>
+          <button id="vistaYtd" class="seg-btn" type="button" aria-pressed="false">Acumulado (YTD)</button>
+        </div>
+        <label class="field">
+          <span>Mes</span>
+          <select id="mesSelect" aria-label="Mes activo"></select>
+        </label>
+      </div>
+      <!-- Selector de mes de la Alianza (independiente). Solo visible en esa vista. -->
+      <div id="mesAlianzaControls" class="controls-mes" hidden>
+        <label class="field">
+          <span>Mes</span>
+          <select id="alzMesSelect" aria-label="Mes de la alianza"></select>
+        </label>
+      </div>
       <button id="refreshBtn" class="btn" type="button">↻ Actualizar</button>
       <span id="lastUpdate" class="last-update"></span>
     </div>
@@ -32,12 +46,45 @@
     <section>
       <h2 class="section-title">¿Cuánto dinero tenemos? · <span id="posMesLabel">—</span></h2>
       <div class="pos-grid">
-        <article class="kpi"><span class="kpi-label">Ingresos plataformas (caja)</span><span id="posPlataformas" class="kpi-value">—</span></article>
-        <article class="kpi"><span class="kpi-label">Otros ingresos</span><span id="posOtros" class="kpi-value">—</span></article>
-        <article class="kpi"><span class="kpi-label">Otras plataformas (confirmado)</span><span id="posOtrasPlataformas" class="kpi-value">—</span></article>
-        <article class="kpi"><span class="kpi-label">Por cobrar (pendiente)</span><span id="posPorCobrar" class="kpi-value">—</span></article>
-        <article class="kpi"><span class="kpi-label">Egresos (Detalle + Externos)</span><span id="posEgresos" class="kpi-value">—</span></article>
-        <article class="kpi highlight"><span class="kpi-label">Disponible + por cobrar</span><span id="posNeto" class="kpi-value">—</span></article>
+        <!-- INGRESOS (verde) — los 4 componentes que suman al ingreso del mes -->
+        <article class="kpi kpi--ingreso">
+          <span class="kpi-tag kpi-tag--ing">▲ Ingreso</span>
+          <span class="kpi-label">Ingresos plataformas <small>(Hotmart, Financiera, Shopify, Dlocal, Brubank, USDT)</small></span>
+          <span id="posPlataformas" class="kpi-value">—</span>
+        </article>
+        <article class="kpi kpi--ingreso">
+          <span class="kpi-tag kpi-tag--ing">▲ Ingreso</span>
+          <span class="kpi-label">Otros ingresos</span>
+          <span id="posOtros" class="kpi-value">—</span>
+        </article>
+        <article class="kpi kpi--ingreso">
+          <span class="kpi-tag kpi-tag--ing">▲ Ingreso</span>
+          <span class="kpi-label">Ingresos externos confirmados <small>(Paypal, Brubank, USDT)</small></span>
+          <span id="posOtrasPlataformas" class="kpi-value">—</span>
+        </article>
+        <article class="kpi kpi--ingreso">
+          <span class="kpi-tag kpi-tag--ing">▲ Ingreso</span>
+          <span class="kpi-label">Ingresos pendientes por cobrar <small>(Hotmart, Dlocal, Shopify, Financiera)</small></span>
+          <span id="posPorCobrar" class="kpi-value">—</span>
+        </article>
+        <!-- TOTAL INGRESOS (verde fuerte) — suma de los 4 anteriores -->
+        <article class="kpi kpi--total-ingreso">
+          <span class="kpi-tag kpi-tag--ing">Σ Total</span>
+          <span class="kpi-label">Total Ingresos <small>(suma de todos los ingresos)</small></span>
+          <span id="posTotalIngresos" class="kpi-value">—</span>
+        </article>
+        <!-- EGRESOS (rojo) -->
+        <article class="kpi kpi--egreso">
+          <span class="kpi-tag kpi-tag--egr">▼ Egreso</span>
+          <span class="kpi-label">Egresos <small>(Detalle + Externos)</small></span>
+          <span id="posEgresos" class="kpi-value">—</span>
+        </article>
+        <!-- PROFIT & LOSS (resultado) — dice si es ganancia o pérdida -->
+        <article class="kpi kpi--resultado highlight">
+          <span id="posNetoEstado" class="kpi-tag kpi-tag--res">Resultado</span>
+          <span class="kpi-label">Resultado del mes · Profit &amp; Loss <small>(Total Ingresos − Egresos)</small></span>
+          <span id="posNeto" class="kpi-value">—</span>
+        </article>
       </div>
       <div class="chart-card pos-chart">
         <h3>Cómo se compone</h3>
@@ -73,7 +120,7 @@
           </article>
           <article class="ln-card muted">
             <header>LN-03 · Alianza Rieznik</header>
-            <div class="ln-note">No disponible en esta vista (no figura en Evolución_Mensual del Sheet).</div>
+            <div class="ln-note">Tiene su propio panel: elegí “Alianza Rieznik” en el selector de Proyecto (arriba).</div>
           </article>
         </div>
         <div class="chart-card">
@@ -105,6 +152,104 @@
         <div class="chart-wrap tall"><canvas id="chartEvolucion"></canvas></div>
       </div>
     </section>
+
+    <!-- Evolución del detalle de egresos (por concepto, mes a mes) -->
+    <section>
+      <h2 class="section-title">Evolución del detalle de egresos</h2>
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <label class="field">
+            <span>Concepto de egreso</span>
+            <select id="egrConceptoSelect" aria-label="Concepto de egreso"></select>
+          </label>
+          <span id="egrDeltaBadge" class="kpi-delta" hidden></span>
+        </div>
+        <p class="chart-hint">Barras en rojo = se gastó más que el mes anterior. Elegí un concepto (ej. Facebook Ads) para comparar su gasto mes a mes, o “Todos” para ver los principales.</p>
+        <div class="chart-wrap tall"><canvas id="chartEgresoDetalle"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Evolución dentro del mes (acumulado de caja día a día) -->
+    <section>
+      <h2 class="section-title">¿Cómo venimos en el mes? · caja acumulada día a día</h2>
+      <div class="chart-card">
+        <div class="chart-wrap tall"><canvas id="chartEvolucionMes"></canvas></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Vista AISLADA de la Alianza Rieznik (P&L propio + liquidación 50/50) —
+       lee las pestañas del rediseño: Evolución_Alianza + Alianza_Detalle. -->
+  <main id="mainAlianza" class="container" hidden>
+    <section>
+      <h2 class="section-title">Alianza Rieznik · 50/50 Jesús / Martín · <span id="alzMesLabel">—</span></h2>
+      <div class="kpi-grid">
+        <article class="kpi"><span class="kpi-label">Ingresos alianza</span><span id="alzIngresos" class="kpi-value pos">—</span></article>
+        <article class="kpi"><span class="kpi-label">Egresos <small>(Ads + operativos)</small></span><span id="alzEgresos" class="kpi-value">—</span></article>
+        <article class="kpi highlight"><span class="kpi-label">Beneficio neto</span><span id="alzBeneficio" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Beneficio por socio <small>(50%)</small></span><span id="alzPorSocio" class="kpi-value">—</span></article>
+        <article class="kpi"><span class="kpi-label">Margen</span><span id="alzMargen" class="kpi-value">—</span></article>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Liquidación del mes · quién le transfiere a quién</h2>
+      <div class="grid-2">
+        <div class="ln-cards">
+          <article class="ln-card">
+            <header>Jesús Tassarolo (TooAudience)</header>
+            <div class="ln-row"><span>Cobró (ingresos)</span><span id="alzJCobro" class="mono">—</span></div>
+            <div class="ln-row"><span>Pagó (gastos)</span><span id="alzJPago" class="mono">—</span></div>
+            <div class="ln-row"><span>Flujo neto (cobró − pagó)</span><span id="alzJFlujo" class="mono">—</span></div>
+            <div class="ln-row"><span>Le corresponde (50%)</span><span id="alzJCorresponde" class="mono">—</span></div>
+            <div class="ln-row"><span>Ajuste (＋recibe / −paga)</span><span id="alzJAjuste" class="mono">—</span></div>
+            <div class="ln-row"><span>Aporte (capital)</span><span id="alzJAporte" class="mono">—</span></div>
+          </article>
+          <article class="ln-card">
+            <header>Martín Rieznik</header>
+            <div class="ln-row"><span>Cobró (ingresos)</span><span id="alzMCobro" class="mono">—</span></div>
+            <div class="ln-row"><span>Pagó (gastos)</span><span id="alzMPago" class="mono">—</span></div>
+            <div class="ln-row"><span>Flujo neto (cobró − pagó)</span><span id="alzMFlujo" class="mono">—</span></div>
+            <div class="ln-row"><span>Le corresponde (50%)</span><span id="alzMCorresponde" class="mono">—</span></div>
+            <div class="ln-row"><span>Ajuste (＋recibe / −paga)</span><span id="alzMAjuste" class="mono">—</span></div>
+            <div class="ln-row"><span>Aporte (capital)</span><span id="alzMAporte" class="mono">—</span></div>
+          </article>
+          <p id="alzAjusteNota" class="ln-note"></p>
+        </div>
+        <div class="chart-card">
+          <h3>Comparativa por socio</h3>
+          <div class="chart-wrap"><canvas id="chartAlianzaSocios"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Desglose del mes</h2>
+      <div class="grid-2">
+        <div class="chart-card">
+          <h3>Ingresos por canal</h3>
+          <div class="chart-wrap"><canvas id="chartAlianzaCanales"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Egresos por categoría</h3>
+          <div class="chart-wrap"><canvas id="chartAlianzaEgresos"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Evolución mensual de la alianza</h2>
+      <div class="chart-card">
+        <div class="chart-wrap tall"><canvas id="chartAlianzaEvolucion"></canvas></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Egresos del mes · detalle</h2>
+      <div class="chart-card">
+        <div id="alzEgresosLista" class="ln-cards"></div>
+      </div>
+    </section>
   </main>
 
   <div id="loading" class="overlay"><div class="spinner"></div><p>Cargando datos del Sheet…</p></div>
@@ -120,10 +265,10 @@
   <script src="chart.umd.min.js?v=4"></script>
   <!-- App (orden importa: config → datos → cálculo → gráficos → orquestación) -->
   <!-- ?v= fuerza recarga sin caché; subir el número al cambiar el código -->
-  <script src="config.js?v=9"></script>
-  <script src="sheets.js?v=9"></script>
-  <script src="calc.js?v=9"></script>
-  <script src="charts.js?v=9"></script>
-  <script src="app.js?v=9"></script>
+  <script src="config.js?v=14"></script>
+  <script src="sheets.js?v=14"></script>
+  <script src="calc.js?v=14"></script>
+  <script src="charts.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
